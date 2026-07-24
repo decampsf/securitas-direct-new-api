@@ -20,7 +20,14 @@ from custom_components.securitas import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
+from custom_components.securitas.automation_api import (
+    AutomationInstallation,
+    AutomationMfaRequiredError,
+)
 from custom_components.securitas.const import (
+    CONF_AUTOMATION_COOKIES,
+    CONF_AUTOMATION_INSTALLATION,
+    CONF_ENABLE_AUTOMATION_CONTACTS,
     CONF_ENABLE_ANNEX_PANEL,
     CONF_ENABLE_INTERIOR_PANEL,
     CONF_ENABLE_PERIMETER_PANEL,
@@ -37,7 +44,7 @@ from custom_components.securitas.verisure_owa_api import (
     VerisureOwaState,
     TwoFactorRequiredError,
 )
-from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_USER
+from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_RECONFIGURE, SOURCE_USER
 from homeassistant.const import (
     CONF_CODE,
     CONF_DEVICE_ID,
@@ -106,6 +113,9 @@ MOCK_PHONES = [
 ]
 
 PATCH_HUB = "custom_components.securitas.config_flow.VerisureHub"
+PATCH_AUTOMATION_CLIENT = (
+    "custom_components.securitas.config_flow.VerisureAutomationClient"
+)
 PATCH_SESSION = "custom_components.securitas.config_flow.async_get_clientsession"
 PATCH_UUID = "custom_components.securitas.config_flow.generate_uuid"
 
@@ -1909,6 +1919,137 @@ async def test_reauth_confirm_valid_credentials(hass):
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
     assert entry.data[CONF_REFRESH_TOKEN] == FAKE_REFRESH_TOKEN
+    assert CONF_PASSWORD not in entry.data
+    mock_reload.assert_awaited_once_with(entry.entry_id)
+
+
+async def test_reauth_enables_automation_contacts(hass):
+    """Reauth stores Automation cookies and installation, never the password."""
+    entry = _make_reauth_entry(hass)
+    result = await _start_reauth_flow(hass, entry)
+    flow_id = result["flow_id"]
+
+    mock_hub = _hub_factory()
+    automation_client = MagicMock()
+    automation_client.authenticate = AsyncMock()
+    automation_client.get_installations = AsyncMock(
+        return_value=[AutomationInstallation("giid-1", "My home")]
+    )
+    automation_client.cookies = {"vid": "session-cookie"}
+
+    with (
+        _patches(mock_hub),
+        patch(PATCH_AUTOMATION_CLIENT, return_value=automation_client),
+        patch.object(
+            hass.config_entries, "async_reload", new_callable=AsyncMock
+        ) as mock_reload,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            flow_id,
+            user_input={
+                CONF_USERNAME: "test@example.com",
+                CONF_PASSWORD: "new-password",
+                CONF_ENABLE_AUTOMATION_CONTACTS: True,
+            },
+        )
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert entry.data[CONF_ENABLE_AUTOMATION_CONTACTS] is True
+    assert entry.data[CONF_AUTOMATION_COOKIES] == {"vid": "session-cookie"}
+    assert entry.data[CONF_AUTOMATION_INSTALLATION] == "giid-1"
+    assert CONF_PASSWORD not in entry.data
+    automation_client.authenticate.assert_awaited_once_with("new-password")
+    mock_reload.assert_awaited_once_with(entry.entry_id)
+
+
+async def test_reauth_enables_automation_contacts_after_mfa(hass):
+    """Automation MFA resumes reauth and persists the resulting session."""
+    entry = _make_reauth_entry(hass)
+    result = await _start_reauth_flow(hass, entry)
+    flow_id = result["flow_id"]
+
+    mock_hub = _hub_factory()
+    automation_client = MagicMock()
+    automation_client.authenticate = AsyncMock(
+        side_effect=AutomationMfaRequiredError("MFA required")
+    )
+    automation_client.validate_mfa = AsyncMock()
+    automation_client.get_installations = AsyncMock(
+        return_value=[AutomationInstallation("giid-1", "My home")]
+    )
+    automation_client.cookies = {"vid": "mfa-session-cookie"}
+
+    with (
+        _patches(mock_hub),
+        patch(PATCH_AUTOMATION_CLIENT, return_value=automation_client),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            flow_id,
+            user_input={
+                CONF_USERNAME: "test@example.com",
+                CONF_PASSWORD: "new-password",
+                CONF_ENABLE_AUTOMATION_CONTACTS: True,
+            },
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "automation_mfa"
+
+    with patch.object(
+        hass.config_entries, "async_reload", new_callable=AsyncMock
+    ) as mock_reload:
+        result = await hass.config_entries.flow.async_configure(
+            flow_id, user_input={CONF_CODE: "123456"}
+        )
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    automation_client.validate_mfa.assert_awaited_once_with("123456")
+    assert entry.data[CONF_AUTOMATION_COOKIES] == {"vid": "mfa-session-cookie"}
+    assert entry.data[CONF_AUTOMATION_INSTALLATION] == "giid-1"
+    assert CONF_PASSWORD not in entry.data
+    mock_reload.assert_awaited_once_with(entry.entry_id)
+
+
+async def test_reconfigure_enables_automation_contacts(hass):
+    """The integration menu exposes the same secure opt-in flow."""
+    entry = _make_reauth_entry(hass)
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+
+    mock_hub = _hub_factory()
+    automation_client = MagicMock()
+    automation_client.authenticate = AsyncMock()
+    automation_client.get_installations = AsyncMock(
+        return_value=[AutomationInstallation("giid-1", "My home")]
+    )
+    automation_client.cookies = {"vid": "session-cookie"}
+
+    with (
+        _patches(mock_hub),
+        patch(PATCH_AUTOMATION_CLIENT, return_value=automation_client),
+        patch.object(
+            hass.config_entries, "async_reload", new_callable=AsyncMock
+        ) as mock_reload,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={
+                CONF_USERNAME: "test@example.com",
+                CONF_PASSWORD: "new-password",
+                CONF_ENABLE_AUTOMATION_CONTACTS: True,
+            },
+        )
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_ENABLE_AUTOMATION_CONTACTS] is True
     assert CONF_PASSWORD not in entry.data
     mock_reload.assert_awaited_once_with(entry.entry_id)
 

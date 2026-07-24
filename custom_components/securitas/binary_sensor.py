@@ -13,7 +13,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import DOMAIN, VerisureDevice
-from .coordinators import AlarmCoordinator
+from .automation_api import AutomationContact
+from .coordinators import AlarmCoordinator, AutomationContactCoordinator
 from .entity import securitas_device_info
 from .verisure_owa_api import Installation
 
@@ -32,6 +33,15 @@ async def async_setup_entry(
         WifiConnectedSensor(coordinator, device.installation)
         for device in securitas_devices
     ]
+    contact_coordinator: AutomationContactCoordinator | None = entry_data.get(
+        "automation_contact_coordinator"
+    )
+    if contact_coordinator is not None and securitas_devices:
+        installation = securitas_devices[0].installation
+        entities.extend(
+            AutomationContactOpeningSensor(contact_coordinator, installation, contact)
+            for contact in contact_coordinator.data.contacts.values()
+        )
     async_add_entities(entities, False)
 
 
@@ -63,3 +73,43 @@ class WifiConnectedSensor(  # type: ignore[override]
         if self.coordinator.data is None:
             return None
         return self.coordinator.data.status.wifi_connected
+
+
+class AutomationContactOpeningSensor(  # type: ignore[override]
+    CoordinatorEntity[AutomationContactCoordinator],
+    BinarySensorEntity,
+):
+    """Door/window contact exposed by the Verisure Automation API."""
+
+    _attr_device_class = BinarySensorDeviceClass.OPENING
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(
+        self,
+        coordinator: AutomationContactCoordinator,
+        installation: Installation,
+        contact: AutomationContact,
+    ) -> None:
+        super().__init__(coordinator)
+        self._device_label = contact.device_label
+        self._attr_name = contact.name
+        self._attr_unique_id = (
+            f"v4_securitas_direct.{installation.number}_automation_contact_"
+            f"{contact.device_label}"
+        )
+        self._attr_device_info = securitas_device_info(installation)
+
+    @property
+    def is_on(self) -> bool | None:  # type: ignore[override]
+        """Return True when the contact reports open."""
+        contact = self.coordinator.data.contacts.get(self._device_label)
+        return contact.is_open if contact is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str]:
+        """Return the last report timestamp when supplied by Verisure."""
+        contact = self.coordinator.data.contacts.get(self._device_label)
+        if contact is None or contact.report_time is None:
+            return {}
+        return {"report_time": contact.report_time}

@@ -40,6 +40,7 @@ from homeassistant.helpers.service import (
 )
 
 from .api_queue import ApiQueue
+from .automation_api import VerisureAutomationClient
 from .const import (  # noqa: F401 — re-exported for backwards compatibility
     API_CACHE_TTL,
     CAMERA_CARD_BASE_URL,
@@ -51,6 +52,8 @@ from .const import (  # noqa: F401 — re-exported for backwards compatibility
     ACTIVITY_LOG_CARD_BASE_URL,
     ACTIVITY_LOG_CARD_URL,
     CONF_ADVANCED,
+    CONF_AUTOMATION_COOKIES,
+    CONF_AUTOMATION_INSTALLATION,
     CONF_CODE_ARM_REQUIRED,
     CONF_COUNTRY,
     CONF_DELAY_CHECK_OPERATION,
@@ -69,6 +72,7 @@ from .const import (  # noqa: F401 — re-exported for backwards compatibility
     CONF_ENABLE_PERIMETER_PANEL,
     CONF_ENABLE_ANNEX_PANEL,
     CONF_ENABLE_ACTIVITY_POLLING,
+    CONF_ENABLE_AUTOMATION_CONTACTS,
     CONF_LOCK_AUTOMATIONS,
     CONF_REFRESH_TOKEN,
     CONF_UNSUPPORTED_COMMANDS,
@@ -92,6 +96,7 @@ from .coordinators import (  # noqa: F401
     _DEFAULT_ACTIVITY_INTERVAL,
     ActivityCoordinator,
     AlarmCoordinator,
+    AutomationContactCoordinator,
     CameraCoordinator,
     LockCoordinator,
     SentinelCoordinator,
@@ -297,6 +302,13 @@ def _build_config_dict(entry: ConfigEntry) -> tuple[dict[str, Any], bool]:
     config[CONF_USERNAME] = entry.data[CONF_USERNAME]
     config[CONF_PASSWORD] = entry.data.get(CONF_PASSWORD, "")
     config[CONF_REFRESH_TOKEN] = entry.data.get(CONF_REFRESH_TOKEN, "")
+    config[CONF_ENABLE_AUTOMATION_CONTACTS] = entry.data.get(
+        CONF_ENABLE_AUTOMATION_CONTACTS, False
+    )
+    config[CONF_AUTOMATION_COOKIES] = dict(entry.data.get(CONF_AUTOMATION_COOKIES, {}))
+    config[CONF_AUTOMATION_INSTALLATION] = entry.data.get(
+        CONF_AUTOMATION_INSTALLATION, ""
+    )
     config[CONF_COUNTRY] = entry.data.get(CONF_COUNTRY, None)
     config[CONF_CODE] = _opt(CONF_CODE, DEFAULT_CODE)
     config[CONF_CODE_ARM_REQUIRED] = _opt(
@@ -944,6 +956,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         sentinel_coord: SentinelCoordinator | None = None
         lock_coord: LockCoordinator | None = None
         activity_coord: ActivityCoordinator | None = None
+        automation_contact_client: VerisureAutomationClient | None = None
+        automation_contact_coord: AutomationContactCoordinator | None = None
 
         # Use the first installation for shared coordinators.
         # (Each config entry is scoped to one installation via CONF_INSTALLATION.)
@@ -1031,6 +1045,45 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     config_entry=entry,
                 )
 
+            automation_cookies = config.get(CONF_AUTOMATION_COOKIES, {})
+            automation_giid = config.get(CONF_AUTOMATION_INSTALLATION, "")
+            if (
+                config.get(CONF_ENABLE_AUTOMATION_CONTACTS)
+                and automation_cookies
+                and automation_giid
+            ):
+
+                def _persist_automation_cookies(cookies: dict[str, str]) -> None:
+                    """Persist rotated Automation cookies without reloading."""
+                    new_data = dict(entry.data)
+                    new_data[CONF_AUTOMATION_COOKIES] = cookies
+                    hass.config_entries.async_update_entry(entry, data=new_data)
+                    for name, value in cookies.items():
+                        log_filter.update_secret(f"automation_{name}", value)
+
+                for name, value in automation_cookies.items():
+                    log_filter.update_secret(f"automation_{name}", value)
+                automation_contact_client = VerisureAutomationClient(
+                    async_get_clientsession(hass),
+                    config[CONF_USERNAME],
+                    cookies=automation_cookies,
+                    on_cookies_changed=_persist_automation_cookies,
+                )
+                automation_contact_coord = AutomationContactCoordinator(
+                    hass,
+                    automation_contact_client,
+                    automation_giid,
+                    update_interval=scan_interval,
+                    config_entry=entry,
+                )
+                await automation_contact_coord.async_refresh()
+                if automation_contact_coord.data is None:
+                    _LOGGER.warning(
+                        "Automation contacts could not be loaded; "
+                        "door/window entities will be skipped"
+                    )
+                    automation_contact_coord = None
+
         # Wire bus-event emission for the activity timeline at the
         # integration level (not the sensor level) so verisure_owa_activity
         # automations keep working even if the user disables the
@@ -1051,6 +1104,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "sentinel_coordinator": sentinel_coord,
             "lock_coordinator": lock_coord,
             "activity_coordinator": activity_coord,
+            "automation_contact_client": automation_contact_client,
+            "automation_contact_coordinator": automation_contact_coord,
             "activity_listener_unsub": activity_listener_unsub,
             "config_entry": entry,
         }

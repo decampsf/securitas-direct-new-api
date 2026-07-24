@@ -15,6 +15,8 @@ Full alarm control: the mappings between HA's five buttons (Home/Away/Night/Vaca
 
 Smart locks, with optional auto-lock when you arm and auto-disarm when you unlock from HA. Cameras with on-demand capture and full-resolution images. Sentinel temperature/humidity/air-quality sensors. A connectivity diagnostic for the panel itself.
 
+Door and window opening sensors are available as an opt-in feature. They use Verisure's separate Automation service because the legacy OWA service does not expose their live states on every installation.
+
 Bundled Lovelace cards: alarm card, alarm badge, [Mushroom](https://github.com/piitaya/lovelace-mushroom) chip, camera card, activity-log card.
 
 The activity log mirrors what you see in the Verisure app — arm/disarm, intrusions, image requests, power events — surfaced as a sensor, a card, and an event bus. Actions you take from HA are tagged with the real HA user and deduplicated against the panel's later echo, so automations fire once.
@@ -56,6 +58,8 @@ Go to **Settings → Integrations → Add Integration** and search for **Verisur
 ![Setup](./docs/images/setup.png)
 
 The wizard handles login (with SMS 2FA if your account uses it), picks an installation if your account has more than one, walks through PIN / notifications / sub-panel options, and lets you map each HA alarm button to a Verisure mode. Repeat the flow once per installation if you have several. Locks and cameras are discovered in the background — the **Lock automation** screen appears under **Configure** once they're registered.
+
+To add door/window sensors to an existing entry, open the integration menu, choose **Reconfigure**, enter the password, and enable **Door/window sensors**. The password is used for that login only and is not stored; only the resulting session cookies are retained. If the Automation service requests an additional verification code, the flow prompts for it on the next screen.
 
 ### Naming: `securitas` vs `verisure_owa`
 
@@ -526,5 +530,4 @@ For protocol-level bugs — wrong alarm state, lock or camera misbehaving — a 
 > **Warning:** HAR files can contain credentials or session tokens. Either redact them (it's plain JSON) or email it to one of the maintainers directly.
 
 The same technique is used to [capture payloads for new operations](./docs/new_operations.md) if you'd like to help add support.
-
 

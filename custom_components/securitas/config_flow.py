@@ -26,6 +26,13 @@ from homeassistant.helpers.selector import (
     selector,
 )
 
+from .automation_api import (
+    AutomationApiError,
+    AutomationAuthenticationError,
+    AutomationMfaRequiredError,
+    VerisureAutomationClient,
+    select_automation_installation,
+)
 from . import (
     CONF_ADVANCED,
     CONF_CODE_ARM_REQUIRED,
@@ -60,10 +67,13 @@ from .const import (
     CIRCUIT_INTERIOR,
     CIRCUIT_PERIMETER,
     CONF_ENABLE_ACTIVITY_POLLING,
+    CONF_ENABLE_AUTOMATION_CONTACTS,
     CONF_ENABLE_ANNEX_PANEL,
     CONF_ENABLE_INTERIOR_PANEL,
     CONF_ENABLE_PERIMETER_PANEL,
     CONF_LOCK_AUTOMATIONS,
+    CONF_AUTOMATION_COOKIES,
+    CONF_AUTOMATION_INSTALLATION,
     DEFAULT_ENABLE_ACTIVITY_POLLING,
     CONF_REFRESH_TOKEN,
     LOCK_CIRCUITS,
@@ -428,6 +438,8 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self._has_peri: bool = False
         self._has_annex: bool = False
         self._reauth_entry: config_entries.ConfigEntry | None = None
+        self._entry_credentials_step_id = "reauth_confirm"
+        self._automation_client: VerisureAutomationClient | None = None
 
     async def _create_entry_for_installation(
         self, installation: Installation
@@ -551,9 +563,7 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             )
         # MFA may succeed without returning a token (hash: null).
         # finish_setup() will call login() to obtain it.
-        if self._reauth_entry is not None:
-            return await self._finish_reauth()
-        return await self.finish_setup()
+        return await self._continue_after_owa_login()
 
     def _user_schema(self, defaults: dict[str, Any] | None = None) -> vol.Schema:
         """Build the credentials form schema with optional defaults."""
@@ -569,8 +579,134 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
                 vol.Required(CONF_USERNAME, default=d.get(CONF_USERNAME, "")): str,
                 vol.Required(CONF_PASSWORD): str,
+                vol.Optional(
+                    CONF_ENABLE_AUTOMATION_CONTACTS,
+                    default=d.get(CONF_ENABLE_AUTOMATION_CONTACTS, False),
+                ): bool,
             }
         )
+
+    def _reauth_schema(self) -> vol.Schema:
+        """Build the reauthentication form, including contact opt-in."""
+        assert self._reauth_entry is not None
+        return vol.Schema(
+            {
+                vol.Required(
+                    CONF_USERNAME,
+                    default=self._reauth_entry.data.get(CONF_USERNAME, ""),
+                ): str,
+                vol.Required(CONF_PASSWORD): str,
+                vol.Optional(
+                    CONF_ENABLE_AUTOMATION_CONTACTS,
+                    default=self.config.get(
+                        CONF_ENABLE_AUTOMATION_CONTACTS,
+                        self._reauth_entry.data.get(
+                            CONF_ENABLE_AUTOMATION_CONTACTS, False
+                        ),
+                    ),
+                ): bool,
+            }
+        )
+
+    def _show_automation_error(self, error: str) -> config_entries.ConfigFlowResult:
+        """Return to the current credentials form with an Automation error."""
+        if self._reauth_entry is not None:
+            return self.async_show_form(
+                step_id=self._entry_credentials_step_id,
+                data_schema=self._reauth_schema(),
+                errors={"base": error},
+            )
+        return self.async_show_form(
+            step_id="user",
+            data_schema=self._user_schema(self.config),
+            errors={"base": error},
+        )
+
+    async def _start_automation_auth(
+        self,
+    ) -> config_entries.ConfigFlowResult | None:
+        """Authenticate the optional Automation contact backend."""
+        if not self.config.get(CONF_ENABLE_AUTOMATION_CONTACTS, False):
+            self.config.pop(CONF_AUTOMATION_COOKIES, None)
+            self.config.pop(CONF_AUTOMATION_INSTALLATION, None)
+            return None
+
+        self._automation_client = VerisureAutomationClient(
+            async_get_clientsession(self.hass), self.config[CONF_USERNAME]
+        )
+        try:
+            await self._automation_client.authenticate(self.config[CONF_PASSWORD])
+        except AutomationMfaRequiredError:
+            return self.async_show_form(
+                step_id="automation_mfa",
+                data_schema=vol.Schema({vol.Required(CONF_CODE): str}),
+            )
+        except AutomationAuthenticationError:
+            return self._show_automation_error("automation_invalid_auth")
+        except AutomationApiError:
+            return self._show_automation_error("automation_cannot_connect")
+        return None
+
+    async def _configure_automation_installation(
+        self, alias: str
+    ) -> config_entries.ConfigFlowResult | None:
+        """Match and persist the Automation installation for an OWA alias."""
+        if not self.config.get(CONF_ENABLE_AUTOMATION_CONTACTS, False):
+            return None
+        assert self._automation_client is not None
+        try:
+            installations = await self._automation_client.get_installations()
+        except AutomationAuthenticationError:
+            return self._show_automation_error("automation_invalid_auth")
+        except AutomationApiError:
+            return self._show_automation_error("automation_cannot_connect")
+        installation = select_automation_installation(installations, alias)
+        if installation is None:
+            return self._show_automation_error("automation_installation_not_found")
+        self.config[CONF_AUTOMATION_COOKIES] = self._automation_client.cookies
+        self.config[CONF_AUTOMATION_INSTALLATION] = installation.giid
+        return None
+
+    async def _continue_after_owa_login(self) -> config_entries.ConfigFlowResult:
+        """Authenticate the optional contact backend, then resume setup."""
+        result = await self._start_automation_auth()
+        if result is not None:
+            return result
+        if self._reauth_entry is not None:
+            result = await self._configure_automation_installation(
+                self._reauth_entry.title
+            )
+            if result is not None:
+                return result
+            return await self._finish_reauth()
+        return await self.finish_setup()
+
+    async def async_step_automation_mfa(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Complete the optional Automation MFA challenge."""
+        if user_input is None:
+            return self.async_show_form(
+                step_id="automation_mfa",
+                data_schema=vol.Schema({vol.Required(CONF_CODE): str}),
+            )
+        assert self._automation_client is not None
+        try:
+            await self._automation_client.validate_mfa(user_input[CONF_CODE])
+        except (AutomationAuthenticationError, AutomationApiError):
+            return self.async_show_form(
+                step_id="automation_mfa",
+                data_schema=vol.Schema({vol.Required(CONF_CODE): str}),
+                errors={"base": "automation_invalid_mfa"},
+            )
+        if self._reauth_entry is not None:
+            result = await self._configure_automation_installation(
+                self._reauth_entry.title
+            )
+            if result is not None:
+                return result
+            return await self._finish_reauth()
+        return await self.finish_setup()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -596,7 +732,7 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             self.config[CONF_DEVICE_INDIGITALL] = existing_hub.config.get(
                 CONF_DEVICE_INDIGITALL, ""
             )
-            return await self.finish_setup()
+            return await self._continue_after_owa_login()
 
         uuid = generate_uuid()
         self.config[CONF_DEVICE_ID] = uuid
@@ -630,12 +766,13 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         # Login succeeded without 2FA — proceed directly
-        return await self.finish_setup()
+        return await self._continue_after_owa_login()
 
     async def async_step_reauth(
         self, entry_data: dict[str, Any]
     ) -> config_entries.ConfigFlowResult:
         """Handle reauth when ConfigEntryAuthFailed is raised."""
+        self._entry_credentials_step_id = "reauth_confirm"
         self._reauth_entry = self.hass.config_entries.async_get_entry(
             self.context["entry_id"]  # type: ignore[typeddict-item]
         )
@@ -647,6 +784,26 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """Show reauth form and handle credential re-entry."""
+        self._entry_credentials_step_id = "reauth_confirm"
+        return await self._async_step_existing_entry_credentials(user_input)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Allow an existing entry to opt into Automation contact sensors."""
+        self._entry_credentials_step_id = "reconfigure"
+        self._reauth_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]  # type: ignore[typeddict-item]
+        )
+        assert self._reauth_entry is not None
+        if user_input is None:
+            self.config = dict(self._reauth_entry.data)
+        return await self._async_step_existing_entry_credentials(user_input)
+
+    async def _async_step_existing_entry_credentials(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Validate credentials for reauth and user-requested reconfiguration."""
         assert self._reauth_entry is not None
         errors: dict[str, str] = {}
 
@@ -654,6 +811,9 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             self.config[CONF_PASSWORD] = user_input[CONF_PASSWORD]
             self.config[CONF_USERNAME] = user_input.get(
                 CONF_USERNAME, self._reauth_entry.data.get(CONF_USERNAME, "")
+            )
+            self.config[CONF_ENABLE_AUTOMATION_CONTACTS] = user_input.get(
+                CONF_ENABLE_AUTOMATION_CONTACTS, False
             )
 
             # Preserve existing device IDs from the entry being reauthenticated
@@ -685,17 +845,11 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             except VerisureOwaError:
                 errors["base"] = "cannot_connect"
             else:
-                return await self._finish_reauth()
+                return await self._continue_after_owa_login()
 
-        username = self._reauth_entry.data.get(CONF_USERNAME, "")
         return self.async_show_form(
-            step_id="reauth_confirm",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_USERNAME, default=username): str,
-                    vol.Required(CONF_PASSWORD): str,
-                }
-            ),
+            step_id=self._entry_credentials_step_id,
+            data_schema=self._reauth_schema(),
             errors=errors,
         )
 
@@ -717,9 +871,24 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         new_data[CONF_USERNAME] = self.config[CONF_USERNAME]
         new_data.pop(CONF_PASSWORD, None)
         new_data[CONF_REFRESH_TOKEN] = refresh_token
+        automation_enabled = self.config.get(CONF_ENABLE_AUTOMATION_CONTACTS, False)
+        new_data[CONF_ENABLE_AUTOMATION_CONTACTS] = automation_enabled
+        if automation_enabled:
+            new_data[CONF_AUTOMATION_COOKIES] = self.config[CONF_AUTOMATION_COOKIES]
+            new_data[CONF_AUTOMATION_INSTALLATION] = self.config[
+                CONF_AUTOMATION_INSTALLATION
+            ]
+        else:
+            new_data.pop(CONF_AUTOMATION_COOKIES, None)
+            new_data.pop(CONF_AUTOMATION_INSTALLATION, None)
         self.hass.config_entries.async_update_entry(self._reauth_entry, data=new_data)
         await self.hass.config_entries.async_reload(self._reauth_entry.entry_id)
-        return self.async_abort(reason="reauth_successful")
+        reason = (
+            "reconfigure_successful"
+            if self._entry_credentials_step_id == "reconfigure"
+            else "reauth_successful"
+        )
+        return self.async_abort(reason=reason)
 
     async def _start_2fa_flow(
         self, errors: dict[str, str] | None = None
@@ -866,6 +1035,12 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         _publish_flow_capabilities(
             self.hass, installation.number, self._has_peri, self._has_annex
         )
+
+        automation_result = await self._configure_automation_installation(
+            installation.alias
+        )
+        if automation_result is not None:
+            return automation_result
 
         return await self.async_step_options()
 

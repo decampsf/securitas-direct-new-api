@@ -7,11 +7,16 @@
             "invalid_otp": "Invalid verification code",
             "otp_expired": "Verification code expired — a new code will be sent",
             "otp_send_failed": "Failed to send verification code — please try again",
+            "automation_invalid_auth": "The door/window service rejected these credentials",
+            "automation_cannot_connect": "Unable to connect to the Verisure door/window service",
+            "automation_installation_not_found": "The matching installation could not be found in the door/window service",
+            "automation_invalid_mfa": "Invalid door/window service verification code",
             "service_error": "Verisure service error: {error}"
         },
         "abort": {
             "already_configured": "Service is already configured",
             "reauth_successful": "Reauthentication successful",
+            "reconfigure_successful": "Verisure settings updated",
             "no_refresh_token": "Login succeeded but Verisure did not return a refresh token. The integration cannot persist credentials safely. Please try again later or report this if it persists."
         },
         "step": {
@@ -20,14 +25,25 @@
                 "description": "Your session has expired. Please re-enter your password to reconnect.",
                 "data": {
                     "username": "Username",
-                    "password": "Password"
+                    "password": "Password",
+                    "enable_automation_contacts": "Enable door/window sensors (uses the separate Verisure Automation service)"
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigure Verisure",
+                "description": "Enter your Verisure password to update the connection and optional services. The password is not stored.",
+                "data": {
+                    "username": "Username",
+                    "password": "Password",
+                    "enable_automation_contacts": "Enable door/window sensors (uses the separate Verisure Automation service)"
                 }
             },
             "user": {
                 "data": {
                     "country": "Country",
                     "username": "Username",
-                    "password": "Password"
+                    "password": "Password",
+                    "enable_automation_contacts": "Enable door/window sensors (uses the separate Verisure Automation service)"
                 },
                 "description": "Login into Verisure.",
                 "title": "Login"
@@ -42,6 +58,13 @@
             "otp_challenge": {
                 "description": "Enter the code you received on your phone",
                 "title": "Verisure 2FA"
+            },
+            "automation_mfa": {
+                "description": "Enter the verification code sent by the Verisure door/window service.",
+                "title": "Door/window verification",
+                "data": {
+                    "code": "Verification code"
+                }
             },
             "select_installation": {
                 "title": "Select Installation",

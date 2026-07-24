@@ -23,6 +23,11 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api_queue import ApiQueue
+from .automation_api import (
+    AutomationApiError,
+    AutomationContact,
+    VerisureAutomationClient,
+)
 from .verisure_owa_api.capabilities import detect_annex, detect_peri
 from .verisure_owa_api.client import VerisureOwaClient
 from .events import HA_INJECTABLE_CATEGORIES
@@ -101,6 +106,13 @@ class LockData:
     """Data returned by LockCoordinator."""
 
     modes: list[SmartLockMode] = field(default_factory=list)
+
+
+@dataclass
+class AutomationContactData:
+    """Current Automation contact states keyed by device label."""
+
+    contacts: dict[str, AutomationContact] = field(default_factory=dict)
 
 
 @dataclass
@@ -459,6 +471,42 @@ class LockCoordinator(DataUpdateCoordinator[LockData]):
     async def _async_update_data(self) -> LockData:
         """Fetch lock modes via the API queue."""
         return await _fetch_with_session_recovery(self._client, self._fetch, "Lock")
+
+
+# ── AutomationContactCoordinator ─────────────────────────────────────────────
+
+
+class AutomationContactCoordinator(DataUpdateCoordinator[AutomationContactData]):
+    """Coordinator for door/window states from the Automation API."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        client: VerisureAutomationClient,
+        giid: str,
+        *,
+        update_interval: timedelta,
+        config_entry: ConfigEntry | None = None,
+    ) -> None:
+        super().__init__(
+            hass,
+            _LOGGER,
+            config_entry=config_entry,
+            name="verisure_automation_contacts",
+            update_interval=update_interval,
+        )
+        self._client = client
+        self._giid = giid
+
+    async def _async_update_data(self) -> AutomationContactData:
+        """Fetch contact states from the Automation overview."""
+        try:
+            contacts = await self._client.get_contacts(self._giid)
+        except AutomationApiError as err:
+            raise UpdateFailed(f"Automation contact update failed: {err}") from err
+        return AutomationContactData(
+            contacts={contact.device_label: contact for contact in contacts}
+        )
 
 
 # ── CameraCoordinator ────────────────────────────────────────────────────────

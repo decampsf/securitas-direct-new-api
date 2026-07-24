@@ -17,6 +17,8 @@ from custom_components.securitas.coordinators import (
     ActivityData,
     AlarmCoordinator,
     AlarmStatusData,
+    AutomationContactCoordinator,
+    AutomationContactData,
     CameraCoordinator,
     CameraData,
     LockCoordinator,
@@ -25,6 +27,11 @@ from custom_components.securitas.coordinators import (
     SentinelData,
 )
 from custom_components.securitas.api_queue import ApiQueue
+from custom_components.securitas.automation_api import (
+    AutomationApiError,
+    AutomationContact,
+    VerisureAutomationClient,
+)
 from custom_components.securitas.verisure_owa_api.client import (
     VerisureOwaClient,
 )
@@ -611,6 +618,48 @@ class TestLockCoordinator:
         coord = self._make_coordinator(hass, client, queue, installation)
         with pytest.raises(UpdateFailed):
             await coord._async_update_data()
+
+
+class TestAutomationContactCoordinator:
+    """Tests for optional Automation door/window polling."""
+
+    @pytest.mark.asyncio
+    async def test_successful_update_indexes_contacts(self) -> None:
+        hass = _make_hass()
+        client = AsyncMock(spec=VerisureAutomationClient)
+        contact = AutomationContact(
+            device_label="MG 01",
+            name="Front door",
+            area="Entrance",
+            state="OPEN",
+        )
+        client.get_contacts.return_value = [contact]
+        coordinator = AutomationContactCoordinator(
+            hass,
+            client,
+            "giid-1",
+            update_interval=timedelta(seconds=60),
+        )
+
+        result = await coordinator._async_update_data()
+
+        assert isinstance(result, AutomationContactData)
+        assert result.contacts == {"MG 01": contact}
+
+    @pytest.mark.asyncio
+    async def test_api_error_is_retryable(self) -> None:
+        hass = _make_hass()
+        client = AsyncMock(spec=VerisureAutomationClient)
+        client.get_contacts.side_effect = AutomationApiError("unavailable")
+        coordinator = AutomationContactCoordinator(
+            hass,
+            client,
+            "giid-1",
+            update_interval=timedelta(seconds=60),
+        )
+
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
 
 
 # ── CameraCoordinator ────────────────────────────────────────────────────────

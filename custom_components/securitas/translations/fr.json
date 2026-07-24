@@ -7,11 +7,16 @@
             "invalid_otp": "Code de vérification non valide",
             "otp_expired": "Le code de vérification a expiré — un nouveau code sera envoyé",
             "otp_send_failed": "Échec de l'envoi du code de vérification — veuillez réessayer",
+            "automation_invalid_auth": "Le service portes et fenêtres a refusé ces identifiants",
+            "automation_cannot_connect": "Impossible de joindre le service Verisure des portes et fenêtres",
+            "automation_installation_not_found": "L'installation correspondante est introuvable dans le service des portes et fenêtres",
+            "automation_invalid_mfa": "Code de vérification du service portes et fenêtres non valide",
             "service_error": "Erreur du service Verisure : {error}"
         },
         "abort": {
             "already_configured": "Le service est déjà configuré",
             "reauth_successful": "Réauthentification réussie",
+            "reconfigure_successful": "Paramètres Verisure mis à jour",
             "no_refresh_token": "La connexion a réussi mais Verisure n'a pas renvoyé de jeton d'actualisation. L'intégration ne peut pas enregistrer les identifiants en toute sécurité. Veuillez réessayer plus tard ou signaler le problème s'il persiste."
         },
         "step": {
@@ -20,14 +25,25 @@
                 "description": "Votre session a expiré. Veuillez saisir à nouveau votre mot de passe pour vous reconnecter.",
                 "data": {
                     "username": "Nom d'utilisateur",
-                    "password": "Mot de passe"
+                    "password": "Mot de passe",
+                    "enable_automation_contacts": "Activer les capteurs de portes et fenêtres (service Verisure Automation séparé)"
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigurer Verisure",
+                "description": "Saisissez votre mot de passe Verisure pour actualiser la connexion et les services facultatifs. Le mot de passe n'est pas conservé.",
+                "data": {
+                    "username": "Nom d'utilisateur",
+                    "password": "Mot de passe",
+                    "enable_automation_contacts": "Activer les capteurs de portes et fenêtres (service Verisure Automation séparé)"
                 }
             },
             "user": {
                 "data": {
                     "country": "Code pays",
                     "username": "Nom d'utilisateur",
-                    "password": "Mot de passe"
+                    "password": "Mot de passe",
+                    "enable_automation_contacts": "Activer les capteurs de portes et fenêtres (service Verisure Automation séparé)"
                 },
                 "description": "Connexion à Verisure.",
                 "title": "Connexion"
@@ -42,6 +58,13 @@
             "otp_challenge": {
                 "description": "Entrez le code reçu sur votre téléphone",
                 "title": "Verisure 2FA"
+            },
+            "automation_mfa": {
+                "description": "Entrez le code envoyé par le service Verisure des portes et fenêtres.",
+                "title": "Vérification des portes et fenêtres",
+                "data": {
+                    "code": "Code de vérification"
+                }
             },
             "select_installation": {
                 "title": "Sélectionner l'installation",

@@ -5,10 +5,16 @@ from unittest.mock import MagicMock
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.const import EntityCategory
 
-from custom_components.securitas.binary_sensor import WifiConnectedSensor
+from custom_components.securitas.automation_api import AutomationContact
+from custom_components.securitas.binary_sensor import (
+    AutomationContactOpeningSensor,
+    WifiConnectedSensor,
+)
 from custom_components.securitas.coordinators import (
     AlarmCoordinator,
     AlarmStatusData,
+    AutomationContactCoordinator,
+    AutomationContactData,
 )
 from custom_components.securitas.verisure_owa_api.models import SStatus
 
@@ -112,3 +118,40 @@ class TestIsOnProperty:
         )
 
         assert sensor.is_on is None
+
+
+class TestAutomationContactOpeningSensor:
+    """Tests for Automation-backed opening sensors."""
+
+    @staticmethod
+    def _make_sensor(state: str = "OPEN") -> AutomationContactOpeningSensor:
+        installation = make_installation()
+        contact = AutomationContact(
+            device_label="MG 01",
+            name="Front door",
+            area="Entrance",
+            state=state,
+            report_time="2026-07-24T12:00:00Z",
+        )
+        coordinator = MagicMock(spec=AutomationContactCoordinator)
+        coordinator.data = AutomationContactData(contacts={"MG 01": contact})
+        return AutomationContactOpeningSensor(coordinator, installation, contact)
+
+    def test_entity_metadata(self) -> None:
+        sensor = self._make_sensor()
+
+        assert sensor._attr_device_class == BinarySensorDeviceClass.OPENING
+        assert sensor._attr_name == "Front door"
+        assert sensor._attr_unique_id == (
+            "v4_securitas_direct.123456_automation_contact_MG 01"
+        )
+
+    def test_open_and_closed_states(self) -> None:
+        assert self._make_sensor("OPEN").is_on is True
+        assert self._make_sensor("CLOSE").is_on is False
+        assert self._make_sensor("UNKNOWN").is_on is None
+
+    def test_report_time_attribute(self) -> None:
+        assert self._make_sensor().extra_state_attributes == {
+            "report_time": "2026-07-24T12:00:00Z"
+        }
