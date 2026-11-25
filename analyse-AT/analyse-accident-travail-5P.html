@@ -588,6 +588,322 @@ const KB = {
   ]
 };
 </script>
+<script>// Enrichissement de la base à partir des analyses d'AT de l'association (2022-2026), anonymisé :
+// situations, causes et mesures qui reviennent dans les fiches, sans aucun nom ni identifiant.
+KB.local = {
+  // Compléments aux thèmes existants
+  extend: {
+    chute: {
+      re: "nid de poule|trou|talus|souche|terrain (en pente|instable|herbeux)|descend(ant|re) (du|de la|de sa) (vehicule|voiture|camion|tracteur|remorque)|en sortant (du|de son|de sa) (vehicule|voiture)|parking|mousse|enjamb|palette|lanier|neige|non eclaire",
+      causes: [
+        ["lc_park", "Mi", 1, "Sol extérieur dégradé (nid de poule, trou, cavité) sur le parking ou la zone de travail", ["lc_signal", "lc_exploitant"]],
+        ["lc_desc", "Me", 1, "Descente du véhicule / de l’engin en marche avant ou sans appui (marchepied, cale-pied)", ["lc_methode"]],
+        ["lc_sombre", "Mi", 1, "Zone non éclairée ou éclairage extérieur hors service", ["g_maint"]],
+        ["lc_raccourci", "T", 1, "Passage par un raccourci hors du cheminement prévu (herbe, racines, mobilier)", ["lc_chemin"]],
+        ["lc_palette", "Mi", 1, "Palette ou objet posé au sol dans une zone de passage", ["lc_stockinter"]],
+        ["lc_huile", "Mi", 1, "Produit glissant au sol (huile, eau) suite à une fuite de machine", ["ch_fuite"]],
+        ["lc_presse", "T", 1, "Précipitation (fin de journée, départ des jeunes, pluie, urgence)", ["g_planning"]],
+        ["lc_terrain", "Mi", 1, "Terrain naturel irrégulier (talus, trous, bosses, souches, ronces)", ["lc_reperage"]],
+        ["lc_signal", "O", 2, "Défaut du sol connu mais non signalé ni réparé", ["g_maint"]],
+        ["lc_exploitant", "O", 2, "Site extérieur dont l’entretien dépend d’un tiers (client, exploitant) non informé", []],
+        ["lc_methode", "Me", 2, "Méthode de descente sûre (3 points d’appui, marche arrière) non connue ou non appliquée", ["g_form"]],
+        ["lc_chemin", "O", 2, "Cheminement piéton non matérialisé ou moins pratique que le raccourci", []],
+        ["lc_stockinter", "O", 2, "Pas de zone de stockage intermédiaire identifiée dans l’atelier", ["g_stock"]],
+        ["lc_reperage", "O", 2, "Repérage de la zone de travail non réalisé avant l’intervention", []],
+        ["lc_sel", "O", 3, "Stock de sel / déneigement non contrôlé ni planifié avant l’hiver", []]
+      ],
+      measures: [
+        [2, "Reboucher les trous / nids de poule et signaler la zone en attendant", ["lc_park", "lc_signal"]],
+        [3, "Informer par écrit le client ou l’exploitant du site de l’état du sol", ["lc_exploitant"]],
+        [2, "Rétablir l’éclairage extérieur (détecteurs de présence) sur les cheminements", ["lc_sombre"]],
+        [3, "Matérialiser au sol les zones de circulation et de stockage intermédiaire", ["lc_palette", "lc_stockinter", "lc_chemin"]],
+        [3, "Afficher et rappeler la méthode de descente des véhicules (3 points d’appui, marche arrière)", ["lc_desc", "lc_methode"]],
+        [3, "Repérer visuellement la zone avant chaque chantier (trous, souches, regards, ronces)", ["lc_terrain", "lc_reperage"]],
+        [3, "Prévoir le contrôle du stock de sel dans le plan de maintenance avant l’hiver", ["lc_sel", "ch_meteo"]],
+        [2, "Réparer la fuite de la machine et condamner le passage en attendant", ["lc_huile"]]
+      ],
+      exist: ["Chaussures de sécurité portées", "Rappel oral de vigilance lors des déplacements"]
+    },
+    manut: {
+      re: "palette au sol|table elevatrice|transpalette ergonomique|reserve|arrach|serre|plants|bassine",
+      causes: [
+        ["lm_sol", "Mi", 1, "Charge stockée au sol ou en bas d’étagère, obligeant à se pencher", ["lm_rangement", "lm_table"]],
+        ["lm_lourd", "T", 1, "Carton trop lourd (> 15-25 kg) soulevé seul et à la main", ["mn_aide", "mn_cond"]],
+        ["lm_penche", "Me", 1, "Travail penché prolongé (arrachage, sol, serre) sans outil adapté", ["lm_outil"]],
+        ["lm_consigne", "I", 1, "Manutention réalisée sans consigne, pour « avancer » le travail", ["g_consignes"]],
+        ["lm_rangement", "O", 2, "Rangement de la réserve non optimisé (atelier récent, place insuffisante)", ["g_stock"]],
+        ["lm_table", "Ma", 2, "Pas de table élévatrice / transpalette ergonomique au poste", ["g_budget"]],
+        ["lm_outil", "Ma", 2, "Pas d’outil ou de support adapté pour éviter le travail au sol", []],
+        ["lm_eveil", "O", 2, "Échauffement / réveil musculaire non pratiqué avant l’activité", []]
+      ],
+      measures: [
+        [2, "Mettre à disposition une table élévatrice ou un transpalette ergonomique", ["lm_sol", "lm_table"]],
+        [1, "Stocker les charges lourdes entre hanches et épaules (réorganiser la réserve)", ["lm_sol", "lm_rangement"]],
+        [3, "Observer les manutentions du poste et définir le poids maximum porté seul", ["lm_lourd", "lm_consigne"]],
+        [2, "Concevoir un outil ou un support pour supprimer le travail penché", ["lm_penche", "lm_outil"]],
+        [3, "Pratiquer le réveil musculaire chaque jour avant l’activité", ["lm_eveil"]]
+      ],
+      exist: ["Réveil musculaire le matin", "Formation gestes et postures réalisée", "Transpalette disponible"]
+    },
+    transfert: {
+      re: "son lit|le lit|remont(e|ant|er) (un|une|le|la)|position laterale|change|habillage|resident|habitant|jeune|toilettes|montauban|rails?|kine|sieste|matelas|fauteuil roulant|retenu|retenir",
+      causes: [
+        ["lt_retenir", "T", 1, "Le professionnel a retenu une personne qui chutait ou se laissait tomber", ["lt_evol", "tr_eval"]],
+        ["lt_bascule", "Ma", 1, "Le lève-personne a basculé (pieds non bloqués, sol, réglage)", ["lt_verif", "lt_rails"]],
+        ["lt_sol", "Ma", 1, "Soin réalisé au sol ou sur un support trop bas (matelas, tapis)", ["lt_chambre"]],
+        ["lt_imprevu", "I", 1, "La personne a fait un mouvement inattendu (s’assoit, s’agite, se laisse aller)", ["tr_eval", "lt_evol"]],
+        ["lt_premiere", "O", 1, "Première prise en charge de la personne par ce professionnel", ["lt_admission"]],
+        ["lt_seule", "O", 1, "Soin réalisé seul(e) alors que la personne a besoin de deux intervenants", ["g_effectif"]],
+        ["lt_evol", "I", 2, "Perte de mobilité / fatigabilité liée à l’évolution du handicap ou au vieillissement", ["tr_eval"]],
+        ["lt_admission", "O", 2, "Besoins et habitudes de vie non recueillis avant l’arrivée de la personne", []],
+        ["lt_verif", "O", 2, "Vérification / révision du lève-personne non à jour", []],
+        ["lt_rails", "O", 3, "Rails plafonniers non prévus lors de la construction de l’établissement", ["g_budget"]],
+        ["lt_chambre", "O", 3, "Locaux insuffisants (pas de chambre de sieste, salle de bain exiguë)", ["g_budget"]],
+        ["lt_sdb", "Mi", 1, "Salle de bain exiguë ou encombrée (équipement inutilisé, baignoire hors service)", ["lt_chambre"]]
+      ],
+      measures: [
+        [2, "Installer des rails plafonniers dans les chambres prioritaires (plan d’investissement)", ["lt_rails", "lt_bascule", "tr_sans"]],
+        [3, "Vérifier la conformité et la date de révision des lève-personnes", ["lt_verif", "lt_bascule"]],
+        [3, "Réévaluer la mobilité de la personne (ergothérapeute) et adapter le mode de transfert", ["lt_evol", "lt_imprevu", "lt_retenir"]],
+        [3, "Rédiger la fiche « habitudes de vie » avec les points de vigilance avant l’admission", ["lt_admission", "lt_premiere"]],
+        [2, "Utiliser un verticalisateur type Montauban / un harnais de marche", ["lt_retenir", "lt_evol"]],
+        [2, "Faire le change sur un lit ou une table à hauteur variable (plus au sol)", ["lt_sol"]],
+        [2, "Libérer la salle de bain (retirer l’équipement inutilisé) et poser des bandes antidérapantes", ["lt_sdb"]],
+        [4, "Inscrire la formation gestes et postures / PRAP 2S au plan de développement des compétences", ["tr_form", "lt_retenir"]]
+      ],
+      exist: ["Lève-personne disponible", "Transferts à deux professionnels", "Formation gestes et postures"]
+    },
+    agression: {
+      re: "jeune|autis|tsa|resident|habitant|beneficiaire|frustr|transition|calin|serre (fort|dans)|agripp|projet(e|ee) contre",
+      causes: [
+        ["la_transition", "T", 1, "Moment de transition (fin d’activité, départ, retour au domicile, changement de lieu)", ["la_anticip"]],
+        ["la_changement", "Mi", 1, "Changement de programme ou de rituel pour la personne accompagnée", ["la_anticip"]],
+        ["la_seul", "O", 1, "Professionnel seul avec la personne au moment de la crise", ["g_effectif", "ag_dati"]],
+        ["la_contact", "Me", 1, "Contact physique pendant la crise (relever, contenir, déplacer la personne)", ["la_consigne"]],
+        ["la_inconnu", "O", 1, "La personne ne connaissait pas le professionnel (intérimaire, remplaçant, apprenti)", ["la_presentation"]],
+        ["la_affect", "I", 1, "Geste brusque sans intention de nuire (besoin d’affection, attachement, communication)", ["la_comm"]],
+        ["la_annonce", "Mi", 2, "Annonce d’un départ ou d’une séparation vécue comme un abandon", ["la_anticip"]],
+        ["la_protocole", "O", 2, "Protocole individuel / procédure violence existant mais non lu ou non connu", ["la_presentation"]],
+        ["la_consigne", "O", 2, "Pas de consigne claire de ne pas se mettre en danger pendant une crise", []],
+        ["la_anticip", "O", 2, "Changement non anticipé ni préparé avec la personne", []],
+        ["la_comm", "Ma", 2, "Pas d’outil de communication ou d’objet de substitution adapté (objet à mordre, tablette)", []],
+        ["la_presentation", "O", 2, "Présentation des personnes accompagnées aux nouveaux / intérimaires insuffisante", ["g_accueil"]],
+        ["la_renfort", "O", 3, "Accompagnement non adapté aux besoins de la personne, en attente de renfort ou d’orientation", []]
+      ],
+      measures: [
+        [3, "Faire évoluer le protocole individuel (signes précurseurs, conduite à tenir) et le diffuser", ["la_protocole", "ag_cat", "ag_signes"]],
+        [3, "Présenter chaque personne accompagnée aux intérimaires / remplaçants et leur faire lire les protocoles", ["la_inconnu", "la_presentation", "la_protocole"]],
+        [3, "Rappeler la consigne : ne pas se mettre en danger, s’éloigner et appeler de l’aide pendant une crise", ["la_consigne", "la_contact"]],
+        [3, "Anticiper et préparer les changements de programme et les transitions", ["la_changement", "la_transition", "la_anticip", "la_annonce"]],
+        [2, "Mettre à disposition des outils de communication et objets de substitution (objet à mordre…)", ["la_comm", "la_affect"]],
+        [3, "Éviter qu’un professionnel soit seul avec une personne identifiée à risque", ["la_seul"]],
+        [4, "Inscrire l’équipe à la formation interne prévention de la violence / gestion de crise", ["ag_form", "la_protocole"]],
+        [3, "Proposer une cellule d’écoute / un psychologue au professionnel et aux témoins", ["ag_crise"]],
+        [3, "Adapter le temps de présence / l’accompagnement de la personne en attendant un renfort", ["la_renfort", "ag_projet"]]
+      ],
+      exist: ["Protocole individuel de la personne", "Procédure violence de l’association", "Salle de repli / d’apaisement", "Formation à la prévention de la violence"]
+    },
+    machine: {
+      re: "agrafeuse|cutter|tournevis|mandrin|usinage|centre d.usinage|disqueuse|karcher|lave[- ]vaisselle|affut|aiguis|scie double|verin|gabarit|cotraitance|conditionnement",
+      causes: [
+        ["la_fixe", "Me", 1, "Pièce non fixée ou non maintenue pendant la coupe / le démontage", ["la_gabarit"]],
+        ["la_raccourci", "Me", 1, "Outil utilisé hors du mode opératoire habituel « pour aller plus vite » (ex. cutter)", ["g_procinad"]],
+        ["la_main", "Me", 1, "Main placée dans la trajectoire de l’outil (tournevis, lame, foret)", ["la_gabarit"]],
+        ["la_atelier", "Mi", 1, "Atelier non rangé / poste exigu, sans séparation entre stockage et entretien", ["g_stock"]],
+        ["la_epi", "I", 1, "Gants anti-coupure non disponibles au poste ou non portés", ["co_gdispo"]],
+        ["la_bouscule", "Mi", 1, "Opération dangereuse réalisée dans un lieu de passage (bousculade)", ["la_lieu"]],
+        ["la_gabarit", "Ma", 2, "Pas de gabarit, cale ou support pour maintenir la pièce", []],
+        ["la_lieu", "O", 2, "Pas de lieu dédié et signalé pour les opérations à risque (affûtage, découpe)", []],
+        ["la_conception", "Ma", 2, "Machine conçue sans dispositif retenant la pièce au démontage", []]
+      ],
+      measures: [
+        [2, "Fabriquer un gabarit / une cale de maintien pour éviter le contact de la main", ["la_fixe", "la_main", "la_gabarit", "la_conception"]],
+        [3, "Revoir le mode opératoire avec les travailleurs pour supprimer le besoin du cutter", ["la_raccourci"]],
+        [5, "Placer des gants anti-coupure à côté de chaque cutter / outil coupant", ["la_epi", "co_gants"]],
+        [3, "Dédier et signaler un lieu pour l’affûtage et les opérations à risque", ["la_bouscule", "la_lieu", "la_atelier"]],
+        [3, "Rédiger une fiche de procédure illustrée (FALC si besoin) affichée au poste", ["mc_proc", "la_raccourci"]],
+        [4, "Séquence d’apprentissage avec le moniteur et habilitation annuelle au poste", ["mc_form"]]
+      ],
+      exist: ["Habilitation au poste", "Fiche de sécurité affichée", "Gants de manutention fournis"]
+    },
+    routier: {
+      re: "scooter|trottinette|moto|velo|pieton|passage pieton|domicile|ebloui|endormi|feu tricolore|priorite|fosse",
+      causes: [
+        ["lr_2roues", "Ma", 1, "Deux-roues (scooter, moto, trottinette) : chaussée humide, équipement défaillant", ["lr_equip"]],
+        ["lr_tiers", "Mi", 1, "Refus de priorité ou faute d’un tiers", []],
+        ["lr_ebloui", "Mi", 1, "Visibilité réduite (soleil rasant, nuit, pluie)", []],
+        ["lr_somnol", "I", 1, "Somnolence / fatigue au volant (traitement, horaires, nuit)", ["lr_traitement", "g_fatigue"]],
+        ["lr_pieton", "Mi", 1, "Traversée piétonne sur une voirie dangereuse (cavités, circulation rapide)", ["lr_voirie"]],
+        ["lr_equip", "I", 2, "Protections non portées (casque, gants, chaussures fermées)", []],
+        ["lr_traitement", "O", 2, "Suivi du traitement médical non coordonné avec le lieu de vie", []],
+        ["lr_voirie", "O", 2, "Défaut de voirie non signalé à la commune", []]
+      ],
+      measures: [
+        [3, "Sensibiliser au risque routier (lettre thématique, ¼ h sécurité, intempéries)", ["lr_2roues", "lr_ebloui", "ro_tel"]],
+        [5, "Rappeler le port du casque et des protections pour les deux-roues", ["lr_equip", "lr_2roues"]],
+        [3, "Coordonner avec l’infirmière / le foyer la vigilance sur la prise du traitement", ["lr_traitement", "lr_somnol"]],
+        [3, "Signaler le défaut de voirie à la commune", ["lr_voirie", "lr_pieton"]],
+        [4, "Proposer un stage de conduite sur chaussée à risque", ["lr_2roues", "ro_meteo"]]
+      ],
+      exist: ["Lettre thématique risque routier", "Préconisations risque routier"]
+    },
+    chimique: {
+      re: "sani|sumabac|wc|flacon|evier|eclabouss|gel",
+      causes: [
+        ["lp_flacon", "Ma", 1, "Flacon presque vide qui projette le produit à la pression", ["lp_fourn"]],
+        ["lp_eau", "Me", 1, "Eau versée à forte pression sur le produit (rebond, éclaboussure)", ["lp_mode"]],
+        ["lp_tenue", "Ma", 1, "Tenue de travail incomplète (pas de lunettes, pas de pantalon)", []],
+        ["lp_fourn", "O", 2, "Produit / conditionnement inadapté chez le fournisseur actuel", ["pc_subst"]],
+        ["lp_mode", "O", 2, "Mode d’emploi du produit non défini (ordre eau / produit)", ["pc_fds"]]
+      ],
+      measures: [
+        [1, "Changer de fournisseur / de produit pour un conditionnement sans projection", ["lp_flacon", "lp_fourn"]],
+        [3, "Définir le mode d’emploi : verser le produit dans l’évier déjà rempli d’eau", ["lp_eau", "lp_mode"]],
+        [5, "Commander la tenue complète (pantalon) et des lunettes pour l’entretien", ["lp_tenue", "pc_epi"]]
+      ],
+      exist: ["Blouse de travail fournie"]
+    },
+    heurt: {
+      re: "ridelle|hayon|benne|coffre|placard|rail|vestiaire|chaise|roulettes",
+      causes: [
+        ["lh_ridelle", "Me", 1, "Ridelle / hayon refermé alors qu’une main était posée dessus", ["lh_signal"]],
+        ["lh_porte", "Ma", 1, "Porte qui se referme seule (ferme-porte, côté charnières)", ["g_maint"]],
+        ["lh_mobilier", "Mi", 1, "Mobilier mal placé à hauteur de tête (coffre-fort, étagère)", []],
+        ["lh_usure", "Ma", 1, "Équipement usé ou défectueux (porte de placard, chaise mal vissée)", ["lh_verif"]],
+        ["lh_signal", "O", 2, "Pas de règle d’annonce / de vérification visuelle avant de refermer", []],
+        ["lh_verif", "O", 2, "Pas de vérification périodique du mobilier et des équipements", []]
+      ],
+      measures: [
+        [3, "Instaurer l’annonce et la vérification visuelle avant de fermer ridelle / hayon", ["lh_ridelle", "lh_signal"]],
+        [2, "Déplacer le mobilier dangereux (coffre-fort, étagère haute)", ["lh_mobilier"]],
+        [3, "Vérifier deux fois par an les chaises, portes de placard et mobilier", ["lh_usure", "lh_verif"]],
+        [2, "Remplacer les portes de placard usées (ex. par des rideaux M1)", ["lh_usure"]]
+      ],
+      exist: []
+    }
+  },
+  // Nouveaux thèmes, issus des accidents fréquents de l'association
+  themes: [
+    {
+      id: "ev", label: "Espaces verts",
+      re: /(espaces? verts?|taille[- ]?haie|tondeuse|tonte|rotofil|debroussaill|broyeur|tronconneuse|haie|arbuste|branche|lamier|chantier|dechets verts|remorque|benne)/g,
+      causes: [
+        ["ev_projection", "Ma", 1, "Projection (branche, débris) dans l’œil malgré ou sous les lunettes", ["ev_lunettes"]],
+        ["ev_lamier", "Me", 1, "Tentative de débloquer le lamier du taille-haie sans arrêter le moteur", ["ev_procedure"]],
+        ["ev_cache", "Mi", 1, "Objet caché dans la haie ou l’herbe (bouteille, pierre, plaque d’égout)", ["ev_reperage", "ev_client"]],
+        ["ev_insecte", "Mi", 1, "Nid de frelons / guêpes / chenilles non repéré dans la zone", ["ev_reperage"]],
+        ["ev_epine", "Mi", 1, "Végétaux épineux (ronces, prunelier) travaillés sans protection des bras", ["ev_tenue"]],
+        ["ev_chaleur", "Mi", 1, "Forte chaleur pendant le chantier", ["ev_canicule"]],
+        ["ev_obstacle", "Mi", 1, "Obstacle en hauteur non repéré (avancée de mur, branche)", ["ev_reperage"]],
+        ["ev_branche", "Me", 1, "Branche ou perche qui casse / revient pendant la coupe", ["ev_casque"]],
+        ["ev_benne", "Me", 1, "Montée dans la benne ou la remorque pour décharger / récupérer du matériel", ["ev_chargement"]],
+        ["ev_repet", "T", 1, "Utilisation prolongée d’une machine lourde (taille-haie thermique, débroussailleuse)", ["ev_rotation"]],
+        ["ev_autonomie", "O", 1, "Équipe en autonomie sur le chantier, sans encadrant présent", ["ev_reperage"]],
+        ["ev_lunettes", "Ma", 2, "Lunettes de protection non adaptées (pas de sur-lunettes, visière non portée)", ["g_budget"]],
+        ["ev_procedure", "O", 2, "Procédure de déblocage machine arrêtée non connue ou non rappelée", ["g_form"]],
+        ["ev_reperage", "O", 2, "Repérage de la zone avant intervention non réalisé ou incomplet", []],
+        ["ev_client", "O", 2, "Site du client mal entretenu (déchets) sans prestation de ramassage prévue", []],
+        ["ev_tenue", "Ma", 2, "Tenue de travail inadaptée (manches courtes, pas de jambières)", []],
+        ["ev_canicule", "O", 2, "Consignes canicule (horaires, pauses, eau) non appliquées sur le chantier", []],
+        ["ev_casque", "Ma", 2, "Casque de protection non porté / non homologué", []],
+        ["ev_chargement", "O", 2, "Organisation du chargement / déchargement de la remorque non définie", []],
+        ["ev_rotation", "O", 2, "Pas de rotation entre travailleurs sur les machines lourdes", []]
+      ],
+      measures: [
+        [3, "Faire un repérage visuel et sonore de la zone avant chaque chantier (insectes, objets cachés, obstacles)", ["ev_reperage", "ev_insecte", "ev_cache", "ev_obstacle"]],
+        [5, "Fournir des sur-lunettes ou une visière grillagée en plus des lunettes de vue", ["ev_projection", "ev_lunettes"]],
+        [5, "Fournir des jambières et une tenue à manches longues pour la taille", ["ev_epine", "ev_tenue", "ev_lamier"]],
+        [3, "Afficher et former à la procédure : moteur arrêté avant tout déblocage du lamier", ["ev_lamier", "ev_procedure"]],
+        [3, "Proposer au client une prestation de ramassage des déchets avant la taille", ["ev_client", "ev_cache"]],
+        [3, "Appliquer les consignes canicule : horaires décalés, pauses régulières, eau sur site", ["ev_chaleur", "ev_canicule"]],
+        [5, "Acheter des casques homologués et les rendre obligatoires pour l’abattage / l’élagage", ["ev_branche", "ev_casque"]],
+        [3, "Interdire de monter dans la benne : organiser le déchargement depuis le sol", ["ev_benne", "ev_chargement"]],
+        [3, "Organiser la rotation sur les machines lourdes et privilégier le matériel électrique plus léger", ["ev_repet", "ev_rotation"]],
+        [3, "Prévoir un moyen d’alerte (téléphone) et des points réguliers pour les équipes en autonomie", ["ev_autonomie"]]
+      ],
+      exist: ["Port des EPI (gants, chaussures, casque anti-bruit, lunettes)", "Périmètre de sécurité respecté", "Visualisation du chantier avant intervention", "Formation interne à l’utilisation des machines", "Réveil musculaire le matin"]
+    },
+    {
+      id: "engin", label: "Chariot / gerbeur / transpalette",
+      re: /(gerbeur|transpalette|chariot elevateur|caces|timon|tracteur|fourches)/g,
+      causes: [
+        ["en_sol", "Mi", 1, "Sol dégradé ou en pente provoquant secousse, blocage ou accélération de l’engin", ["en_travaux"]],
+        ["en_recul", "Me", 1, "Manœuvre en marche arrière avec les pieds trop proches de l’engin", ["en_regle"]],
+        ["en_engin", "Ma", 1, "Engin non adapté au sol (roues pleines, sans amortisseur)", ["g_budget"]],
+        ["en_regle", "O", 2, "Règles de conduite (position des pieds, vitesse lente au recul) non rappelées", ["g_form"]],
+        ["en_travaux", "O", 3, "Réfection du sol de l’atelier en attente (bâtiment ancien, devis)", ["g_budget"]]
+      ],
+      measures: [
+        [2, "Refaire le sol dégradé / boucher provisoirement les trous", ["en_sol", "en_travaux"]],
+        [3, "Baliser la zone dégradée et stocker la marchandise sur une zone saine", ["en_sol"]],
+        [3, "Rappeler les règles de conduite : vitesse minimale au recul, pieds en retrait", ["en_recul", "en_regle"]],
+        [4, "Vérifier les autorisations de conduite / CACES des conducteurs", ["en_regle"]]
+      ],
+      exist: ["Autorisation de conduite / CACES", "Chaussures de sécurité", "Ceinture de sécurité"]
+    },
+    {
+      id: "malaise", label: "Malaise / état de santé",
+      re: /(malaise|epilep|etourdi|vertige|pacemaker|perte de connaissance|s.est endormi|fatigu|chaleur|deshydrat)/g,
+      causes: [
+        ["ma_patho", "I", 1, "Problème de santé connu (épilepsie, malaises, cardiaque) de la personne", ["ma_suivi"]],
+        ["ma_fatigue", "I", 1, "Personne arrivée fatiguée ou préoccupée (sommeil, problèmes personnels)", ["ma_reperage"]],
+        ["ma_chaleur", "Mi", 1, "Forte chaleur dans l’atelier ou sur le chantier", ["ev_canicule"]],
+        ["ma_isole", "O", 1, "Personne isolée à son poste au moment du malaise", []],
+        ["ma_environ", "Mi", 1, "Environnement dangereux en cas de chute (vaisselle, mobilier, machine)", ["ma_poste"]],
+        ["ma_suivi", "O", 2, "Suivi médical / traitement non coordonné avec l’équipe pluridisciplinaire", []],
+        ["ma_reperage", "O", 2, "Signes de fatigue non repérés ou sans conduite à tenir définie", []],
+        ["ma_poste", "O", 2, "Poste non adapté à l’état de santé de la personne", []]
+      ],
+      measures: [
+        [3, "Ne jamais laisser la personne seule à son poste (travail en groupe)", ["ma_isole", "ma_patho"]],
+        [2, "Installer la personne dans un endroit dégagé, sans objets dangereux à proximité", ["ma_environ", "ma_patho"]],
+        [3, "Définir la conduite à tenir face aux signes de fatigue (repos à l’infirmerie, prévenir famille / foyer)", ["ma_fatigue", "ma_reperage"]],
+        [3, "Faire le point en équipe pluridisciplinaire (temps partiel, changement d’atelier, suivi médical)", ["ma_suivi", "ma_poste"]],
+        [3, "Mettre à disposition des sièges assis-debout et alterner les tâches", ["ma_poste", "ma_fatigue"]],
+        [3, "Diffuser les consignes canicule : hydratation, pauses plus fréquentes", ["ma_chaleur"]]
+      ],
+      exist: ["Vigilance de l’équipe sur l’état de fatigue", "Salariés SST présents", "Infirmerie / lieu de repos"]
+    },
+    {
+      id: "conflit", label: "Altercation entre personnes",
+      re: /(altercation|enerve|coup de poing (dans|sur) (la|le|un|une) (porte|carter|arbre|mur)|dispute|conflit)/g,
+      causes: [
+        ["cf_alter", "I", 1, "Altercation avec un collègue juste avant l’accident", ["cf_emotion"]],
+        ["cf_emotion", "I", 2, "Difficulté à gérer ses émotions (fragilité psychique connue)", ["cf_soutien"]],
+        ["cf_soutien", "O", 2, "Pas de temps de parole ni d’accompagnement pour gérer les tensions", []],
+        ["cf_signal", "O", 2, "Accident non signalé à l’encadrant sur le moment", []]
+      ],
+      measures: [
+        [3, "Mettre en place un groupe de parole / accompagnement à la gestion des émotions", ["cf_emotion", "cf_soutien"]],
+        [3, "Rappeler le règlement de fonctionnement et la conduite à tenir en cas de conflit", ["cf_alter"]],
+        [3, "Rappeler l’obligation de signaler immédiatement tout accident à l’encadrant", ["cf_signal"]]
+      ],
+      exist: ["Règlement de fonctionnement"]
+    }
+  ],
+  coach: [
+    { re: /(n.a pas ecoute|pas respecte les consignes|voulait aller (plus )?vite|pour aller plus vite|presse|depech)/, tip: "Ne vous arrêtez pas au non-respect des consignes : pourquoi la personne a-t-elle fait autrement ? La consigne était-elle connue, praticable, compatible avec le temps disponible ?" },
+    { re: /(autis|tsa|handicap|patholog|trouble|epilep|son comportement)/, tip: "La pathologie de la personne explique la situation, mais doit être la dernière explication : cherchez aussi ce qui, dans l’organisation ou l’environnement, a rendu l’accident possible (transition, changement de programme, professionnel seul…)." }
+  ],
+  // Mesures jugées trop faibles si elles sont les seules du plan d'action
+  weakActions: /(rappel|sensibilis|vigilance|attention|prudence|redoubler)/
+};
+
+// Fusion avec la base générale
+(function () {
+  const L = KB.local;
+  KB.themes.forEach(th => {
+    const x = L.extend[th.id]; if (!x) return;
+    if (x.re) th.re = new RegExp(th.re.source + "|" + x.re, "g");
+    th.causes = th.causes.concat(x.causes || []);
+    th.measures = th.measures.concat(x.measures || []);
+    th.exist = (th.exist || []).concat(x.exist || []);
+  });
+  // insère les nouveaux thèmes en tête : ce sont les plus fréquents dans l'association
+  KB.themes = L.themes.concat(KB.themes);
+  KB.coach = KB.coach.concat(L.coach);
+})();
+</script>
 <script>"use strict";
 /* ============ Utilitaires ============ */
 const $ = (s, r = document) => r.querySelector(s);
@@ -689,8 +1005,14 @@ function suggestFor(d, bi) {
 }
 function pisteIdeas(d) {
   const act = new Set(activeThemes(d)); const used = usedSet(d);
-  const tsc = themeScores(d); const w = id => (d.themes[id] ? 3 : 0) + (tsc[id] || 0);
-  return Object.values(CAUSES).filter(c => act.has(c.theme) && c.d === 1 && !used.has("#" + c.id) && !used.has(norm(c.t))).sort((a, b) => w(b.theme) - w(a.theme)).slice(0, 8);
+  const tsc = themeScores(d); const w = id => (d.themes[id] ? 3 : 0) + Math.min(4, tsc[id] || 0);
+  const ctx = words(contextText(d));
+  const sc = Object.values(CAUSES).filter(c => act.has(c.theme) && c.d === 1 && !used.has("#" + c.id) && !used.has(norm(c.t)))
+    .map(c => { let s = w(c.theme); words(c.t).forEach(x => { if (ctx.has(x)) s += 2; }); return [s, c]; })
+    .sort((a, b) => b[0] - a[0]);
+  const per = {}; const out = [];
+  for (const [, c] of sc) { per[c.theme] = (per[c.theme] || 0) + 1; if (per[c.theme] <= 3) out.push(c); if (out.length >= 8) break; }
+  return out;
 }
 function coachTips(d, bi) {
   const br = d.branches[bi]; const tips = [];
@@ -775,13 +1097,14 @@ function afterRender() {
 function autoGrow(t) { t.style.height = "auto"; t.style.height = Math.max(t.scrollHeight + 2, 64) + "px"; }
 
 /* ---------- Champs ---------- */
+const SPELL = 'spellcheck="true" lang="fr" autocapitalize="sentences" autocorrect="on"';
 function field(label, path, opts = {}) {
   const v = getPath(S, path) ?? "";
   const ph = opts.ph ? ` placeholder="${esc(opts.ph)}"` : "";
   const live = opts.live ? ` data-live="${opts.live}"` : "";
   const inp = opts.area
-    ? `<textarea data-f="${path}"${ph}${live} rows="${opts.rows || 3}">${esc(v)}</textarea>`
-    : `<input type="${opts.type || "text"}" data-f="${path}" value="${esc(v)}"${ph}${live}${opts.list ? ` list="${opts.list}"` : ""}>`;
+    ? `<textarea data-f="${path}"${ph}${live} rows="${opts.rows || 3}" ${SPELL}>${esc(v)}</textarea>`
+    : `<input type="${opts.type || "text"}" data-f="${path}" value="${esc(v)}"${ph}${live}${opts.list ? ` list="${opts.list}"` : ""}${(opts.type || "text") === "text" ? " " + SPELL : ""}>`;
   return `<label class="fld"><span class="lbl">${label}</span>${inp}${opts.hint ? `<span class="hint">${opts.hint}</span>` : ""}</label>`;
 }
 function choice(label, path, options, multi = false) {
@@ -873,7 +1196,7 @@ function renderPhotos() {
     <label class="btn primary">📷 Ajouter des photos<input type="file" accept="image/*" multiple id="photoIn" hidden></label>
     <button class="btn" id="sketchBtn">✏️ Faire un croquis</button></div>
   <div class="photos">${S.photos.map((p, i) => `<div class="photo"><img src="${p.data}" alt="Photo ${i + 1}">
-    <input type="text" data-f="photos.${i}.caption" value="${esc(p.caption || "")}" placeholder="Légende (facultatif)">
+    <input ${SPELL} type="text" data-f="photos.${i}.caption" value="${esc(p.caption || "")}" placeholder="Légende (facultatif)">
     <div class="row"><button class="ghost small" data-pmove="${i}" data-d="-1" ${i === 0 ? "disabled" : ""}>←</button><button class="ghost small" data-pmove="${i}" data-d="1" ${i === S.photos.length - 1 ? "disabled" : ""}>→</button><button class="ghost danger small" data-pdel="${i}">Supprimer</button></div></div>`).join("")}</div>
   ${S.photos.length ? "" : `<p class="muted">Aucune image. Photos du lieu, du matériel en cause, ou croquis de la situation.</p>`}`;
 }
@@ -915,7 +1238,7 @@ function whyStep(b, bi, s, si) {
   const isLast = si === b.steps.length - 1;
   return `<li class="why">
     <div class="q"><span class="num">P${si + 1}</span> ${q}</div>
-    <textarea data-f="branches.${bi}.steps.${si}.a" data-live="p5" data-bi="${bi}" rows="2" placeholder="Parce que…">${esc(s.a)}</textarea>
+    <textarea ${SPELL} data-f="branches.${bi}.steps.${si}.a" data-live="p5" data-bi="${bi}" rows="2" placeholder="Parce que…">${esc(s.a)}</textarea>
     <div class="row small">
       <select data-f="branches.${bi}.steps.${si}.cat" aria-label="Catégorie"><option value="">Catégorie…</option>${Object.entries(KB.cats).map(([k, v]) => `<option value="${k}" ${s.cat === k ? "selected" : ""}>${v}</option>`).join("")}</select>
       ${b.root && isLast ? `<span class="badge root">Cause racine</span>` : ""}
@@ -952,10 +1275,19 @@ function renderMesures() {
     ${sc.length ? `<div class="chips small"><span class="muted">Ajouter :</span>${sc.map(s => `<button class="chip" data-addline="exist" data-v="${esc(s)}">＋ ${esc(s)}</button>`).join("")}</div>` : ""}
   </div>
   <h2>Mesures de prévention à prévoir pour éviter un nouvel accident</h2>
+  ${weakPlan()}
   <div id="actions">${S.actions.map((a, i) => actionCard(a, i)).join("") || `<p class="muted">Aucune action pour l’instant. Ajoutez-en une ou utilisez les suggestions ci-dessous.</p>`}</div>
   <div class="row"><button class="btn" id="addAction">＋ Ajouter une action</button></div>
   <div class="card sugg">${measureSugg()}</div>
   <p class="muted small">Ces actions sont à ajouter à votre plan d’action sécurité pluriannuel (dernier onglet du DUERP).</p>`;
+}
+function weakPlan() {
+  const acts = S.actions.filter(a => a.action.trim());
+  const tips = [];
+  if (acts.length && acts.every(a => KB.local.weakActions.test(norm(a.action))))
+    tips.push("Votre plan ne contient que des rappels ou de la sensibilisation. Ces mesures s’oublient vite : ajoutez au moins une action qui modifie durablement la situation (matériel, aménagement, organisation, procédure écrite).");
+  if (acts.some(a => !a.pilote.trim() || !a.delai.trim())) tips.push("Chaque action doit avoir un pilote et un délai, sinon elle risque de ne jamais être réalisée.");
+  return tips.map(t => `<div class="coach">💡 ${t}</div>`).join("");
 }
 function actionCard(a, i) {
   return `<div class="card action">
